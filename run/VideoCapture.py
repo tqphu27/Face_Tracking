@@ -181,134 +181,130 @@ class VideoCapture(threading.Thread):
     
     def process(self):
         """TODO: add docstring"""
-        
-        metric = nn_matching.NearestNeighborDistanceMetric("cosine", 0.2, None)
 
-        class_names = read_class_names()
+        metric = nn_matching.NearestNeighborDistanceMetric("cosine", 0.2, None)
+        class_names = ['face']
         tracker = Tracker(metric)
-    
+        
         frame_num = 0
         name = []
         count_objects = True
         start_frame_time = time.time()
+        start_frame = time.time()
+        start_enc = time.time()
+        start_track = time.time()
+        
         dets = None
         features = []
-        f = 0
-        t = 0
+        fps_counter = 0  # Initialize the FPS counter
+        fps_interval = 1.0  # FPS update interval (in seconds)
+        fps = 0  # Initialize the FPS value
+        detections = []
         while self.running:
             ret, frame = self.vid.read()
             if ret:
                 frame_num += 1
-                start_time = time.time()
-            
+                   
                 elapsed_time = time.time() - start_frame_time
+                el = time.time() - start_frame
 
-                if elapsed_time > 0.1:
-                    start_frame_time = time.time()
+                if el < 0.07:
+                    if frame_num == 1 or frame_num % 4 == 0:
+                        det, _ = detector.detect(frame, 0.5)
+                        dets = np.copy(det)
+                else:
+                    start_frame = time.time()
                     continue
-                
-                t1 = time.time()
-                if frame_num == 1 or frame_num % 10 == 0:
-                    det, _ = detector.detect(frame, 0.6)
-                    dets = np.copy(det)
-                    
-                print("Thoi gian detect", round((time.time()-t1),2))
-                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
                 if dets is None:
                     bboxes = []
                     scores = []
                     classes = []
                     num_objects = 0
-                    
                 else:   
-                    bboxes = np.copy(dets[:,:4])
+                    # Instead of: bboxes = np.copy(dets[:,:4])
+                    bboxes = np.copy(dets[:, :4])
                     bboxes[:,2] = bboxes[:,2] - bboxes[:,0] # convert from xyxy to xywh
-
                     bboxes[:,3] = bboxes[:,3] - bboxes[:,1]
-                    
                     scores = dets[:,4]
                     classes = dets[:,-1]
                     num_objects = bboxes.shape[0]
                 
-                names = []
+                names = ['face']*num_objects
+                # for i in range(num_objects):
+                #     class_indx = int(classes[i])
+                #     class_name = class_names[class_indx]
+                #     names.append(class_name)
                 
-                for i in range(num_objects):
-                    class_indx = int(classes[i])
-                    class_name = class_names[class_indx]
-                    names.append(class_name)
-                
-                names = np.array(names)
-                count = len(names)
+                # names = np.array(names)
+                count = num_objects
 
                 if count_objects:
-                    cv2.putText(frame, "Objects being tracked: {}".format(count), (5, 35), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (0, 0, 0), 2)
-
-            # ---------------------------------- DeepSORT tracker work starts here ------------------------------------------------------------
-            
-                # ---------------------------------- Check mask + id ----------------------------------
+                    cv2.putText(frame, "Objects being tracked: {}".format(count), (5, 35), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5, (255,255,255), 2)
                 
-                if frame_num % 15 == 0:
-                    t2 = time.time()
-                    feature = encoder(frame, bboxes)
-                    print("Thoi gian encode", time.time()-t2)
-                    features = np.copy(feature)
-                    name = []
-                    
-                    if len(features) > 0:
-                        t3 = time.time()
-                        for feat in features:
-                            n = _check_exits_customer_id(es, (feat/norm(feat)).tolist())
-                            if n is not None:
-                                name.append(n)
-                        print("Thoi gian tim kiem", time.time()-t3)
-   
-                if len(name)!=0:
-                    names = name
-                
-                print(names)
-                
-                t2 = time.time()
-                detections = [Detection(bbox, score, class_name, feature) for bbox, score, class_name, feature in zip(bboxes, scores, names, features)] # [No of BB per frame] deep_sort.detection.Detection object
-
-                cmap = plt.get_cmap('tab20b') #initialize color map
-                colors = [cmap(i)[:3] for i in np.linspace(0, 1, 20)]
-
-                boxs = np.array([d.tlwh for d in detections])  # run non-maxima supression below
-                scores = np.array([d.confidence for d in detections])
-                classes = np.array([d.class_name for d in detections])
-                indices = preprocessing.non_max_suppression(boxs, classes, 1, scores)
-                detections = [detections[i] for i in indices] 
-                
+                enc = time.time() - start_enc
+                # features = encoder(frame, bboxes)
+                # if enc < 0.:
+                # features = encoder(frame, bboxes)
+                if enc < 0.12:
+                    if frame_num == 1 or frame_num % 10 == 0:
+                        features = encoder(frame, bboxes)
+                        name = []
+                        if len(features) > 0:
+                            t3 = time.time()
+                            for feat in features:
+                                n = _check_exits_customer_id(es, (feat/norm(feat)).tolist())
+                                if n is not None:
+                                    name.append(n)
+                            print("Thoi gian tim kiem", time.time()-t3)
         
-                tracker.predict()  # Call the tracker
-                tracker.update(detections) #  updtate using Kalman Gain
-                print("---------------------------", time.time() - t2)
-                for track in tracker.tracks:  # update new findings AKA tracks
-                    if not track.is_confirmed() or track.time_since_update > 1:
-                        continue 
-                    bbox = track.to_tlbr()
-                    class_name = track.get_class()
-                    color = colors[int(track.track_id) % len(colors)]  # draw bbox on screen
-                    color = [i * 255 for i in color]
-        
-                    cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), color, 2)
-                    cv2.rectangle(frame, (int(bbox[0]), int(bbox[1]-30)), (int(bbox[0])+(len(class_name)+len(str(track.track_id)))*17, int(bbox[1])), color, -1)
-                    cv2.putText(frame, class_name ,(int(bbox[0]), int(bbox[1]-11)),0, 0.6, (255,255,255),1, lineType=cv2.LINE_AA)    
-                    
-            #     #     if verbose == 2:
-            #     #         print("Tracker ID: {}, Class: {},  BBox Coords (xmin, ymin, xmax, ymax): {}".format(str(track.track_id), class_name, (int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]))))
+                        if len(name) != 0:
+                            names = name
                         
-            #     # -------------------------------- Tracker work ENDS here -----------------------------------------------------------------------
-               
-            #     print((time.time() - start_time))
-                fps = 1.0 / (time.time() - start_time) # calculate frames per second of running detections
+                        print(names)
+                else: start_enc = time.time()
+                        
+                # else: start_enc = time.time()
                 
-                if not count_objects: print(f"Processed frame no: {frame_num} || Current FPS: {round(fps,2)}")
-                else: print(f"Processed frame no: {frame_num} || Current FPS: {round(fps,2)} || Objects tracked: ")
+                if frame_num == 1 or frame_num % 3 == 0:
+                    detections = [Detection(bbox, score, class_name, feature) for bbox, score, class_name, feature in zip(bboxes, scores, names, features)]
+                    cmap = plt.get_cmap('tab20b')
+                    colors = [cmap(i)[:3] for i in np.linspace(0, 1, 20)]
 
-                
+                    boxs = np.array([d.tlwh for d in detections])
+                    scores = np.array([d.confidence for d in detections])
+                    classes = np.array([d.class_name for d in detections])
+                    indices = preprocessing.non_max_suppression(boxs, classes, 1, scores)
+                    detections = [detections[i] for i in indices] 
+                    
+                    tracker.predict()
+                    tracker.update(detections)
+                  
+                    for track in tracker.tracks:
+                        if not track.is_confirmed() or track.time_since_update > 1:
+                            continue 
+                        bbox = track.to_tlbr()
+                        class_name = track.get_class()
+                        color = colors[int(track.track_id) % len(colors)]
+                        color = [i * 255 for i in color]
+
+                        cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), color, 2)
+                        cv2.rectangle(frame, (int(bbox[0]), int(bbox[1]-30)), (int(bbox[0])+(len(class_name)+len(str(track.track_id)))*17, int(bbox[1])), color, -1)
+                        cv2.putText(frame, class_name, (int(bbox[0]), int(bbox[1]-11)), 0, 0.6, (255, 255, 255), 1, lineType=cv2.LINE_AA)    
+
+                fps_counter += 1  # Increment the FPS counter
+
+                if elapsed_time >= fps_interval:  # Check if 1 second has passed
+                    fps = fps_counter / elapsed_time  # Calculate the frames per second
+                    fps_counter = 0  # Reset the FPS counter
+                    start_frame_time = time.time()
+                    if not count_objects:
+                        print(f"Processed frame no: {frame_num} || Current FPS: {round(fps, 2)}")
+                    else:
+                        print(f"Processed frame no: {frame_num} || Current FPS: {round(fps, 2)} || Objects tracked: ")
+                   
                 frame = cv2.resize(frame, (self.width, self.height))
-                cv2.putText(frame, "FPS: {}".format(round(fps, 2)), (frame.shape[1]-105, 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.8 , (0, 30, 30), 2)  
+                cv2.putText(frame, "FPS: {}".format(round(fps, 2)), (frame.shape[1] - 105, 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.8, (255, 255, 255), 2)
 
                 # it has to record before converting colors
                 if self.recording:
@@ -330,7 +326,8 @@ class VideoCapture(threading.Thread):
             self.frame = frame
 
             # sleep for next frame
-            time.sleep(1/self.fps)
+            time.sleep(1 / self.fps)
+
 
     def get_frame(self):
         """TODO: add docstring"""

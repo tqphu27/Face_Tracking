@@ -19,7 +19,7 @@ class App:
         width = 400
         height = 300
 
-        columns = 4
+        columns = 3
         for number, (text, source) in enumerate(sources):
             widget = tkCamera(self.parent, text, source, width, height, sources)
             row = number // columns
@@ -44,66 +44,92 @@ if __name__ == "__main__":
     sources = [  # (text, source)
         # local webcams
         # remote videos (or streams)
+        # (
+        #     "Zakopane, Poland",
+        #     "/home/tima/detec_and_tracking/data/2.mp4",
+        # ),
         (
             "Zakopane, Poland",
-            "/home/tima/detec_and_tracking/1.mp4",
+            "/home/tima/detec_and_tracking/data/22.mp4",
         ),
         (
             "Warszawa, Poland",
-            "/home/tima/detec_and_tracking/1.mp4",
-        ),
-        
-        (
-            "Zakopane, Poland",
-            "/home/tima/detec_and_tracking/3.mp4",
-        ),
-        (
-            "Zakopane, Poland",
-            "/home/tima/detec_and_tracking/6.mp4",
-        ),
-        
-        (
-            "Warszawa, Poland",
-            "/home/tima/detec_and_tracking/10.mp4",
-        ),
-          
-        # ('Mountains, Poland', 'http://172.16.4.47:4747/video'),
-        (
-            "Warszawa, Poland",
-            "/home/tima/detec_and_tracking/6.mp4",
+            "/home/tima/detec_and_tracking/data/23.mp4",
         ),
         (
             "Warszawa, Poland",
-            "/home/tima/detec_and_tracking/7.mp4",
+            "/home/tima/detec_and_tracking/data/24.mp4",
         ),
         (
             "Warszawa, Poland",
-            "/home/tima/detec_and_tracking/8.mp4",
+            "/home/tima/detec_and_tracking/data/25.mp4",
         ),
         (
             "Warszawa, Poland",
-            "/home/tima/detec_and_tracking/9.mp4",
+            "/home/tima/detec_and_tracking/data/26.mp4",
         ),
         (
             "Warszawa, Poland",
-            "/home/tima/detec_and_tracking/10.mp4",
+            "/home/tima/detec_and_tracking/data/27.mp4",
         ),
         (
             "Warszawa, Poland",
-            "/home/tima/detec_and_tracking/1.mp4",
+            "/home/tima/detec_and_tracking/data/22.mp4",
         ),
         (
             "Warszawa, Poland",
-            "/home/tima/detec_and_tracking/6.mp4",
+            "/home/tima/detec_and_tracking/data/23.mp4",
         ),
         # (
         #     "Warszawa, Poland",
-        #     "/home/tima/detec_and_tracking/9.mp4",
+        #     "/home/tima/detec_and_tracking/data/23.mp4",
+        # ),
+        (
+            "Zakopane, Poland",
+            "/home/tima/detec_and_tracking/data/25.mp4",
+        ),
+        # (
+        #     "Zakopane, Poland",
+        #     "/home/tima/detec_and_tracking/data/22.mp4",
+        # ),
+        
+        # # ('Mountains, Poland', 'http://172.16.4.47:4747/video'),
+        # (
+        #     "Warszawa, Poland",
+        #     "/home/tima/detec_and_tracking/data/17.mp4",
+        # ),
+        # (
+        #     "Warszawa, Poland",
+        #     "/home/tima/detec_and_tracking/data/14.mp4",
+        # ),
+        # (
+        #     "Warszawa, Poland",
+        #     "/home/tima/detec_and_tracking/data/18.mp4",
+        # ),
+        # (
+        #     "Warszawa, Poland",
+        #     "/home/tima/detec_and_tracking/data/19.mp4",
+        # ),
+        # (
+        #     "Warszawa, Poland",
+        #     "/home/tima/detec_and_tracking/data/12.mp4",
+        # ),
+        # (
+        #     "Warszawa, Poland",
+        #     "/home/tima/detec_and_tracking/data/16.mp4",
+        # ),
+        # (
+        #     "Warszawa, Poland",
+        #     "/home/tima/detec_and_tracking/data/11.mp4",
+        # ),
+        # (
+        #     "Warszawa, Poland",
+        #     "/home/tima/detec_and_tracking/data/20.mp4",
         # ),
         
         # (
         #     "Warszawa, Poland",
-        #     "/home/tima/detec_and_tracking/5.mp4",
+        #     "/home/tima/detec_and_tracking/data/5.mp4",
         # ),
         # (
         #     "Warszawa, Poland",

@@ -8,9 +8,9 @@ import numpy as np
 from numpy.linalg import norm
 from PIL import Image
 from datetime import datetime
-
+import aiohttp
 import uvicorn
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.responses import RedirectResponse
 from elasticsearch import Elasticsearch, helpers
@@ -48,11 +48,15 @@ async def file_to_image(file):
     img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
     return img
 
-async def url_to_image(img_str):
-    imgdata = requests.get(img_str)    
-    img = Image.open(io.BytesIO(imgdata.content))
-    img = np.asarray(img)
-    return img
+async def url_to_image(url):
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise Exception(f"Failed to fetch image from URL: {url}")    
+    img_data = response.content
+    img = Image.open(io.BytesIO(img_data))
+    img_np = np.array(img)
+    
+    return img_np
 
 def predict(img):
     f1,f2 = face_mask.extract_feature(img)
@@ -139,6 +143,89 @@ async def face_mask_route(name: str, phone: str, files: UploadFile = File(...)):
     except Exception as e:
         return JSONResponse(content={"message": f"Error while processing image: {str(e)}"}, status_code=500)
 
+
+@app.post("/api/get_image_from_url")
+async def face_mask_from_url(name: str, phone: str, image_url: str):
+    try:
+        
+        image = await url_to_image(image_url)  # Assuming file_to_image converts image bytes to image
+
+        feature_face, feature_mask = predict(image)
+        vec = (feature_face[0] / norm(feature_face[0])).tolist()
+        query = {
+            "min_score": 0.95,
+            "query": {
+                "function_score": {
+                    "boost_mode": "replace",
+                    "script_score": {
+                        "script": {
+                            "source": "binary_vector_score",
+                            "lang": "knn",
+                            "params": {
+                                "cosine": True,
+                                "field": "face_embedding",
+                                "vector": vec
+                            }
+                        }
+                    }
+                }
+            },
+            "_source": ['name','phone']
+        }
+        
+        check_emb, id_exist = es._check_exists_embedding(index='id_face', data = query)
+        
+        if check_emb:
+            try:
+                query = {
+                    "query": {
+                        "bool": {
+                            "must": [
+                                {"match": {"name": name}},
+                                {"match": {"phone": phone}}
+                            ]
+                        }
+                    }
+                }
+                
+                check_exists = es._check_exists(index='id_face', data = query)
+                
+                if check_exists:
+                    return JSONResponse(status_code=200, content={"message": "Already Exists"})
+                else:
+                    update_data = {
+                        "doc": {
+                            "name": name,
+                            "phone": phone
+                        }
+                    }
+                    es.update_record(index="id_face", id_record=id_exist, data=update_data)
+                    
+                    return JSONResponse(status_code=200, content={"message": "Success"})
+                
+            except Exception as e:
+                return JSONResponse(content={"message": f"Error while checking existence: {str(e)}"}, status_code=500)
+        else:
+            data = [
+                {
+                    'name': name,
+                    'phone': phone,
+                    'create_on': datetime.now().strftime('%d/%m/%Y %H:%M:%S'),
+                    'face_embedding': encode_array(feature_face[0]),
+                    'face_mask_embedding': encode_array(feature_mask[0]),
+                    'last_modified': datetime.now().strftime('%d/%m/%Y %H:%M:%S'),
+                },
+            ]
+            
+            try:
+                es._insert(index = 'id_face', data = data)
+                return JSONResponse(status_code=200, content={"message": "Success"})
+            
+            except Exception as e:
+                return JSONResponse(content={"message": f"Error while bulk indexing: {str(e)}"}, status_code=500)
+            
+    except Exception as e:
+        return JSONResponse(content={"message": f"Error while processing image: {str(e)}"}, status_code=500)
 
 if __name__=='__main__':
     uvicorn.run('api:app',reload=True)
